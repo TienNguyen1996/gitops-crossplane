@@ -1,0 +1,73 @@
+apiVersion: azure.upbound.io/v1beta1
+kind: ProviderConfig
+metadata:
+  name: azure-prvider
+spec:
+  source: Secret
+  SecretRef:
+    namespace: crossplane-system
+    key: creds
+---
+apiVersion: azure.upbound.io/v1beta1
+kind: ResourceGroup
+metadata:
+  name: crosplane-rg
+spec:
+  providerConfigRef:
+    name: azure-provider
+  forProvider:
+    location: West Europe
+    tags:
+      provisioner: crossplane
+---
+apiVersion: network.azure.upbound.io/v1beta1
+kind: VirtualNetwork
+metadata:
+  name: vn-crossplane
+spec:
+  providerConfigRef:
+    name: azure-provider
+  forProvider:
+    resourceGroupNameRef:
+      name: crossplane-rg
+    location: West Europe
+      addressSpace:
+        - 10.2.0.0/
+---
+apiVersion: network.azure.upbound.io/v1beta1
+kind: Subnet
+metadata:
+  name: sub-crossplane
+spec:
+  providerConfigRef:
+    name: azure-provider
+  forProvider:
+    addressPrefixes:
+      - 10.0.1.0/24
+    resourceGroupNameRef:
+      name: crossplane-rg
+    virtualNetworkNameRef:
+      name: vn-crossplane
+---
+apiVersion: containerservice.azure.upbound.io/v1beta1
+kind: KubernetesCluster
+metadata:
+  labels:
+    testing.upbound.io/example-name: example
+  name: example
+spec:
+  providerConfigRef:
+    name: azure-provider
+  forProvider:
+    defaultNodePool:
+      - name: default
+        nodeCount: 1
+        vmSize: Standard_D2_v2
+        cnetSubnetIdRef: 
+          name: sub-crossplane
+    dnsPrefix: aks
+    identity:
+      - type: SystemAssigned
+    location: West Europe
+    resourceGroupNameRef:
+      name: crossplane-rg

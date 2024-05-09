@@ -1,0 +1,383 @@
+apiVersion: v1    
+  kind: ProviderConfig
+  metadata:
+    name: aws-eks
+    namespace: crossplane
+spec:
+  credentials:
+    source: Secret
+    secretRef:
+      namespace:
+      name:
+      key: credentials
+---
+apiVersion: ec2.aws.upbound.io/v1beta1
+kind: VPC
+metadata:
+  name: dev-main
+spec:
+  providerConfigRef:
+    name: aws-provider
+  forProvider:
+    cidrBlock: 10.0.0.0/16
+    region: ap-southeast-1
+    tags:
+      Name: dev-main
+---
+apiVersion: ec2.aws.upbound.io/v1beta1
+kind: InternetGateway
+metadata:
+  name: dev-igw
+spec:
+  forProvider:
+    region: ap-southeast-1
+    tags:
+      Name: dev-igw
+    vpcIdRef:
+      name: dev-main
+---
+apiVersion: ec2.aws.upbound.io/v1beta1
+kind: Subnet
+metadata:
+  name: dev-private-ap-southeast-1a
+  labels:
+    name: dev-private-ap-southeast-1a
+spec:
+  providerConfigRef: 
+    name: aws-provider
+  forProvider:
+    availabilityZone: ap-southeast-1a
+    cidrBlock: 10.0.0.0/19
+    region: ap-southeast-1
+      tags: 
+        Name: dev-private-ap-southeast-1a
+        kubernetes.io/role/internal-elb: '1'
+        kubernetes.io/cluster/dev: 'owned'
+      vpcIdRef:
+        name: dev-main
+---
+apiVersion: ec2.aws.upbound.io/v1beta1
+kind: Subnet
+metadata:
+  name: dev-private-ap-southeast-1b
+  labels:
+    name: dev-private-ap-southeast-1b
+spec:
+  providerConfigRef: 
+    name: aws-provider
+  forProvider:
+    availabilityZone: ap-southeast-1b
+    cidrBlock: 10.0.32.0/19
+    region: ap-southeast-1
+      tags: 
+        Name: dev-private-ap-southeast-1b
+        kubernetes.io/role/internal-elb: '1'
+        kubernetes.io/cluster/dev: 'owned'
+      vpcIdRef:
+        name: dev-main
+---
+apiVersion: ec2.aws.upbound.io/v1beta1
+kind: Subnet
+metadata:
+  name: dev-public-ap-southeast-1a
+  labels:
+    name: dev-public-ap-southeast-1a
+spec:
+  providerConfigRef: 
+    name: aws-provider
+  forProvider:
+    availabilityZone: ap-southeast-1a
+    cidrBlock: 10.0.64.0/19
+    region: ap-southeast-1
+      tags: 
+        Name: dev-public-ap-southeast-1a
+        kubernetes.io/role/internal-elb: '1'
+        kubernetes.io/cluster/dev: 'owned'
+      vpcIdRef:
+        name: dev-main
+---
+apiVersion: ec2.aws.upbound.io/v1beta1
+kind: Subnet
+metadata:
+  name: dev-public-ap-southeast-1b
+  labels:
+    name: dev-public-ap-southeast-1b
+spec:
+  providerConfigRef: 
+    name: aws-provider
+  forProvider:
+    availabilityZone: ap-southeast-1b
+    cidrBlock: 10.0.96.0/19
+    region: ap-southeast-1
+      tags: 
+        Name: dev-public-ap-southeast-1b
+        kubernetes.io/role/internal-elb: '1'
+        kubernetes.io/cluster/dev: 'owned'
+      vpcIdRef:
+        name: dev-main
+---
+apiVersion: ec2.aws.upbound.io/v1beta1
+kind: EIP
+metadata:
+  name: dev-nat
+spec:
+  providerConfigRef:
+    name: aws-provider
+  forProvider:
+    region: ap-southeast-1
+    vpc: true
+    tags:
+      Name: dev-nat
+---
+apiVersion: ec2.aws.upbound.io/v1beta1
+kind: NATGateway
+metadata:
+  name: dev-nat
+spec:
+  providerConfigRef:
+    name: aws-provider
+  forProvider:
+    connectivityType: public
+    region: ap-southeast-1
+    subnetIdSelector:
+      matchLabels:
+        name: dev-public-ap-southeast-1a
+    tags:
+      Name: dev-nat
+---
+apiVersion: ec2.aws.upbound.io/v1beta1
+kind: RouteTable
+metadata:
+  name: dev-private
+spec:
+  providerConfigRef:
+    name: aws-provider
+  forProvider:
+    region: ap-southeast-1
+    tags:
+      Name: dev-private
+    vpcIdRef:
+      name: dev-main
+---
+apiVersion: ec2.aws.upbound.io/v1beta1
+kind: Route
+metadata:
+  name: dev-private
+spec:
+  providerConfigRef:
+    name: aws-provider
+  forProvider:
+    destinationCidrBlock: 0.0.0.0/0
+    gatewayIdRef:
+      name: dev-nat
+    region: ap-southeast-1
+    routeTableIdRef:
+      name: dev-private
+---
+apiVersion: ec2.aws.upbound.io/v1beta1
+kind: RouteTable
+metadata:
+  name: dev-public
+spec:
+  providerConfigRef:
+    name: aws-provider
+  forProvider:
+    region: ap-southeast-1
+    tags:
+      Name: dev-public
+    vpcIdRef:
+      name: dev-main
+--- 
+apiVersion: ec2.aws.upbound.io/v1beta1
+kind: Route
+metadata:
+  name: dev-public
+spec:
+  providerConfigRef:
+    name: aws-provider
+  forProvider:
+    destinationCidrBlock: 0.0.0.0/0
+    gatewayIdRef:
+      name: dev-igw
+    region: ap-southeast-1
+    routeTableIdRef:
+      name: dev-public
+---
+apiVersion: ec2.aws.upbound.io/v1beta1
+kind: RouteTableAssociation
+metadata:
+  name: dev-private-ap-southeast-1a
+spec:
+  providerConfigRef:
+    name: aws-provider
+  forProvider:
+    region: ap-southeast-1
+    routeTableIdRef:
+      name: dev-private
+    subnetIdRef:
+      name: dev-private-ap-southeast-1a
+---
+apiVersion: ec2.aws.upbound.io/v1beta1
+kind: RouteTableAssociation
+metadata:
+  name: dev-private-ap-southeast-1b
+spec:
+  providerConfigRef:
+    name: aws-provider
+  forProvider:
+    region: ap-southeast-1
+    routeTableIdRef:
+      name: dev-private
+    subnetIdRef:
+      name: dev-private-ap-southeast-1b
+---
+apiVersion: ec2.aws.upbound.io/v1beta1
+kind: RouteTableAssociation
+metadata:
+  name: dev-public-ap-southeast-1a
+spec:
+  providerConfigRef:
+    name: aws-provider
+  forProvider:
+    region: ap-southeast-1
+    routeTableIdRef:
+      name: dev-public
+    subnetIdRef:
+      name: dev-public-ap-southeast-1a
+---
+apiVersion: ec2.aws.upbound.io/v1beta1
+kind: RouteTableAssociation
+metadata:
+  name: dev-public-ap-southeast-1b
+spec:
+  providerConfigRef:
+    name: aws-provider
+  forProvider:
+    region: ap-southeast-1
+    routeTableIdRef:
+      name: dev-public
+    subnetIdRef:
+      name: dev-public-ap-southeast-1b
+---
+apiVersion: iam.aws.upbound.io/v1beta1
+kind: Role
+metadata:
+  name: eks-cluster-role
+spec:
+  providerConfigRef:
+    name: aws-provider
+  forProvider:
+    assumeRolePolicy: |
+      {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Effect": "Allow",
+            "Principal": {
+              "Service": "eks.amazonaws.com"
+            },
+            "Action": "sts:AssumeRole"
+          }
+        ]
+      }
+---
+apiVersion: iam.aws.upbound.io/v1beta1
+kind: RolePolicyAttachment
+metadata:
+  name: dev-eks-cluster-amazon-eks-cluster-policy
+spec:
+  providerConfigRef:
+    name: aws-provider
+  forProvider:
+    role: eks-cluster-role
+    policyArn: arn:aws:iam::aws:policy/AmazonEKSClusterPolicy
+---
+apiVersion: eks.aws.upbound.io/v1beta1
+kind: Cluster
+metadata:
+  annotations:
+    uptest.upbound.io/timeout: "2400"
+  name: eks-created-by-crossplane
+spec:
+  providerConfigRef:
+    name: aws-provider
+  forProvider:
+    region: ap-southeast-1
+    roleArnRef:
+      name: eks-cluster-role
+    vpcConfig:
+      - endpointPrivateAccess: false
+        endpointPublicAccess: true
+        subnetIdRefs:
+          - name: dev-private-ap-southeast-1a
+          - name: dev-private-ap-southeast-1b
+---
+apiVersion: iam.aws.upbound.io/v1beta1
+kind: Role
+metadata:
+  name: eks-nodes-role
+spec:
+  providerConfigRef:
+    name: aws-provider
+  forProvider:
+    assumeRolePolicy: |
+      {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Effect": "Allow",
+            "Principal": {
+              "Service": "ec2.amazonaws.com"
+            },
+            "Action": "sts:AssumeRole"
+          }
+        ]
+      }
+---
+apiVersion: iam.aws.upbound.io/v1beta1
+kind: RolePolicyAttachment
+metadata:
+  name: dev-amazon-eks-worker-node-policy
+spec:
+  providerConfigRef:
+    name: aws-provider
+  forProvider:
+    role: eks-cluster-role
+    policyArn: arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy
+---
+apiVersion: iam.aws.upbound.io/v1beta1
+kind: RolePolicyAttachment
+metadata:
+  name: dev-eks-nodes-amazon-eks-cni-policy
+spec:
+  providerConfigRef:
+    name: aws-provider
+  forProvider:
+    role: eks-node-role
+    policyArn: arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+---
+apiVersion: eks.aws.upbound.io/v1beta1
+kind: NodeGroup
+metadata:
+  name: general
+spec:
+  providerConfigRef:
+    name: aws-provider
+  forProvider:
+    ClusterNameRef:
+      name: eks-created-by-crossplane
+    nodeRoleArnRef:
+      name: eks-nodes-role
+    region: ap-southeast-1
+    capacityType: ON_DEMAND
+    instanceTypes: ["t3.small"]
+    labels:
+      role: general
+    scalingConfig:
+      - desireSize: 1
+        minSize: 1
+        maxSize: 10
+    subnetIdRefs:
+      - name: dev-private-ap-southeast-1a
+      - name: dev-private-ap-southeast-1b
+---
